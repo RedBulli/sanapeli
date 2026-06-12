@@ -195,23 +195,22 @@
     .key-row {
       display: flex;
       justify-content: center;
-      gap: 5px;
+      gap: clamp(3px, 1vw, 5px);
     }
 
     .key {
       height: 56px;
-      min-width: 40px;
-      padding: 0 6px;
+      min-width: 0;
+      padding: 0 2px;
       border: none;
       border-radius: 4px;
       background: var(--key-bg);
       color: var(--key-text);
-      font-size: 0.85rem;
+      font-size: clamp(0.6rem, 3vw, 0.85rem);
       font-weight: 700;
       cursor: pointer;
       text-transform: uppercase;
       flex: 1;
-      max-width: 44px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -220,7 +219,7 @@
       touch-action: manipulation;
     }
 
-    .key.wide { max-width: 66px; font-size: 0.75rem; }
+    .key.wide { flex: 1.5; font-size: clamp(0.55rem, 2.5vw, 0.75rem); }
 
     .key.correct { background: var(--correct); }
     .key.present { background: var(--present); }
