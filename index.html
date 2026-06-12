@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sanapeli</title>
+  <style>
+    :root {
+      --bg: #121213;
+      --tile-bg: #121213;
+      --tile-border: #3a3a3c;
+      --tile-border-active: #565758;
+      --text: #ffffff;
+      --text-muted: #818384;
+      --correct: #538d4e;
+      --present: #b59f3b;
+      --absent: #3a3a3c;
+      --key-bg: #818384;
+      --key-text: #ffffff;
+      --header-border: #3a3a3c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    header {
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid var(--header-border);
+      padding: 12px 16px;
+      position: relative;
+    }
+
+    header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    #help-btn {
+      position: absolute;
+      right: 16px;
+      background: none;
+      border: none;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 1.4rem;
+      line-height: 1;
+      padding: 4px 8px;
+    }
+
+    #toast-container {
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: var(--text);
+      color: var(--bg);
+      padding: 10px 18px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      opacity: 1;
+      transition: opacity 0.4s;
+    }
+
+    .toast.fade-out { opacity: 0; }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 500px;
+      padding: 16px 8px 8px;
+      gap: 8px;
+    }
+
+    #board-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-grow: 1;
+    }
+
+    #board {
+      display: grid;
+      grid-template-rows: repeat(6, 1fr);
+      gap: 5px;
+      width: min(350px, calc(100vw - 24px));
+      height: min(420px, calc(100vw * 1.2 - 24px));
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+    }
+
+    .tile {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--tile-border);
+      font-size: clamp(1.2rem, 5vw, 2rem);
+      font-weight: 700;
+      text-transform: uppercase;
+      user-select: none;
+      transition: border-color 0.1s;
+      position: relative;
+    }
+
+    .tile[data-letter] { border-color: var(--tile-border-active); }
+
+    .tile.reveal {
+      animation: flip 0.5s ease forwards;
+    }
+
+    .tile.bounce {
+      animation: bounce 0.1s ease;
+    }
+
+    .tile.shake {
+      animation: shake 0.5s ease;
+    }
+
+    .tile.pop {
+      animation: pop 0.1s ease;
+    }
+
+    @keyframes flip {
+      0%   { transform: rotateX(0deg); }
+      45%  { transform: rotateX(-90deg); }
+      55%  { transform: rotateX(-90deg); }
+      100% { transform: rotateX(0deg); }
+    }
+
+    @keyframes bounce {
+      0%,100% { transform: translateY(0); }
+      50%     { transform: translateY(-20px); }
+    }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%     { transform: translateX(-6px); }
+      40%     { transform: translateX(6px); }
+      60%     { transform: translateX(-4px); }
+      80%     { transform: translateX(4px); }
+    }
+
+    @keyframes pop {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+
+    .tile.correct { background: var(--correct); border-color: var(--correct); color: #fff; }
+    .tile.present { background: var(--present); border-color: var(--present); color: #fff; }
+    .tile.absent  { background: var(--absent);  border-color: var(--absent);  color: #fff; }
+
+    #keyboard {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 0 4px 8px;
+    }
+
+    .key-row {
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .key {
+      height: 56px;
+      min-width: 40px;
+      padding: 0 6px;
+      border: none;
+      border-radius: 4px;
+      background: var(--key-bg);
+      color: var(--key-text);
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      flex: 1;
+      max-width: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    .key.wide { max-width: 66px; font-size: 0.75rem; }
+
+    .key.correct { background: var(--correct); }
+    .key.present { background: var(--present); }
+    .key.absent  { background: var(--absent); }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #1a1a1b;
+      border: 1px solid var(--header-border);
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 340px;
+      width: 90%;
+      position: relative;
+      text-align: center;
+    }
+
+    .modal h2 {
+      font-size: 1.1rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+    }
+
+    .modal p {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #ccc;
+      margin-bottom: 10px;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      background: none;
+      border: none;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 1.4rem;
+    }
+
+    .example {
+      display: flex;
+      gap: 5px;
+      justify-content: center;
+      margin: 10px 0 4px;
+    }
+
+    .ex-tile {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: 700;
+      border: 2px solid var(--tile-border);
+      text-transform: uppercase;
+    }
+
+    .ex-tile.correct { background: var(--correct); border-color: var(--correct); }
+    .ex-tile.present { background: var(--present); border-color: var(--present); }
+    .ex-tile.absent  { background: var(--absent);  border-color: var(--absent); }
+
+    .ex-label {
+      font-size: 0.82rem;
+      color: #ccc;
+      margin-bottom: 14px;
+      text-align: left;
+    }
+
+    #stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .stat-item { text-align: center; }
+    .stat-num  { font-size: 2rem; font-weight: 700; }
+    .stat-lbl  { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; }
+
+    #next-word-section {
+      margin-top: 16px;
+      border-top: 1px solid var(--header-border);
+      padding-top: 16px;
+    }
+
+    #countdown {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin: 4px 0 12px;
+    }
+
+    #share-btn {
+      background: var(--correct);
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+    }
+
+    #share-btn:hover { filter: brightness(1.1); }
+
+    #answer-reveal {
+      margin-top: 12px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    #answer-reveal strong {
+      color: var(--text);
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Sanapeli</h1>
+  <button id="help-btn" aria-label="Ohjeet">?</button>
+</header>
+
+<div id="toast-container"></div>
+
+<main>
+  <div id="board-container">
+    <div id="board"></div>
+  </div>
+  <div id="keyboard"></div>
+</main>
+
+<!-- Help modal -->
+<div class="modal-overlay" id="help-modal">
+  <div class="modal">
+    <button class="modal-close" id="help-close">×</button>
+    <h2>Kuinka pelata</h2>
+    <p>Arvaa <strong>SANAPELI</strong> kuudessa yrityksessä.</p>
+    <p>Jokainen arvaus on oltava oikea 5-kirjaiminen suomalainen sana.</p>
+    <hr style="border-color:#3a3a3c;margin:12px 0"/>
+    <p style="margin-bottom:6px"><strong>Esimerkkejä:</strong></p>
+
+    <div class="example">
+      <div class="ex-tile correct">A</div>
+      <div class="ex-tile">U</div>
+      <div class="ex-tile">T</div>
+      <div class="ex-tile">I</div>
+      <div class="ex-tile">O</div>
+    </div>
+    <p class="ex-label">Kirjain <strong>A</strong> on oikeassa paikassa.</p>
+
+    <div class="example">
+      <div class="ex-tile">T</div>
+      <div class="ex-tile">A</div>
+      <div class="ex-tile present">L</div>
+      <div class="ex-tile">O</div>
+      <div class="ex-tile">N</div>
+    </div>
+    <p class="ex-label">Kirjain <strong>L</strong> on sanassa mutta väärässä paikassa.</p>
+
+    <div class="example">
+      <div class="ex-tile">S</div>
+      <div class="ex-tile">I</div>
+      <div class="ex-tile">S</div>
+      <div class="ex-tile">U</div>
+      <div class="ex-tile absent">S</div>
+    </div>
+    <p class="ex-label">Kirjainta <strong>S</strong> ei ole sanassa.</p>
+
+    <p style="margin-top:8px">Uusi sanapeli joka päivä!</p>
+  </div>
+</div>
+
+<!-- Stats modal -->
+<div class="modal-overlay" id="stats-modal">
+  <div class="modal">
+    <button class="modal-close" id="stats-close">×</button>
+    <h2>Tilastot</h2>
+    <div id="stats-grid">
+      <div class="stat-item"><div class="stat-num" id="s-played">0</div><div class="stat-lbl">Pelattu</div></div>
+      <div class="stat-item"><div class="stat-num" id="s-winpct">0</div><div class="stat-lbl">% voittoja</div></div>
+      <div class="stat-item"><div class="stat-num" id="s-streak">0</div><div class="stat-lbl">Putki</div></div>
+      <div class="stat-item"><div class="stat-num" id="s-maxstreak">0</div><div class="stat-lbl">Paras putki</div></div>
+    </div>
+    <div id="next-word-section">
+      <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)">Seuraava sana</div>
+      <div id="countdown">--:--:--</div>
+      <button id="share-btn">Jaa tulos 📤</button>
+      <div id="answer-reveal"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Word list (KOTUS / hugovk) ───────────────────────────────────────────────
+const WORDS = ["aaloe", "aalto", "aamen", "aaria", "aarre", "aatos", "aatra", "aatto", "ahava", "ahdas", "ahdin", "ahkio", "ahmia", "ahnas", "ahtaa", "ahven", "aidas", "aihio", "aijai", "aikoa", "aines", "ainoa", "ainut", "aioli", "airut", "aisti", "aitio", "aitoa", "aitta", "aivan", "aivot", "ajaja", "ajelu", "ajuri", "akana", "aktio", "alati", "alava", "aleta", "alias", "alibi", "alkaa", "alkio", "allas", "aloke", "alppi", "altis", "altto", "aluke", "aluna", "ambra", "ameba", "ammis", "ammua", "ammus", "ammuu", "ampua", "ankea", "ankka", "annos", "anodi", "anoja", "ansas", "ansio", "antaa", "apaja", "apeus", "apila", "apina", "apnea", "appaa", "apuri", "arabi", "arava", "argon", "arina", "arkki", "arkku", "armas", "aromi", "arpoa", "arvio", "asema", "asemo", "asete", "askar", "askel", "astia", "astin", "astma", "astua", "asuja", "asuma", "atari", "atlas", "atomi", "aueta", "aukea", "aukio", "aukko", "aukoa", "aulio", "aulis", "aunus", "aussi", "autio", "avain", "avara", "avata", "avaus", "avoin", "azeri", "baana", "baari", "balsa", "bambu", "banjo", "bantu", "barbi", "bardi", "baski", "basso", "baudi", "bebee", "bebop", "beesi", "beeta", "beibi", "beige", "bensa", "bidee", "biisi", "bilsa", "bingo", "bitti", "blini", "blues", "boksi", "bongo", "bonus", "booli", "boomi", "boori", "bravo", "bromi", "bukee", "bulla", "bussi", "buumi", "buuri", "bygga", "bändi", "bänet", "bänks", "chili", "chips", "civis", "crack", "curry", "daami", "dandy", "debet", "deeku", "dekki", "delta", "depis", "diiva", "diodi", "dippi", "disko", "dogmi", "donna", "dorka", "doula", "durra", "duuma", "duuni", "duuri", "dyyni", "edetä", "eeden", "eepos", "eesti", "eheys", "ehken", "ehtiä", "ehtoo", "ehtyä", "eilen", "eines", "eksyä", "ellei", "eloon", "elpyä", "eläin", "eläjä", "eläke", "elämä", "elävä", "emali", "empiä", "enetä", "ennen", "ensin", "entäs", "entää", "epeli", "epäys", "erite", "eritä", "eroon", "erota", "esiin", "esine", "esite", "essee", "estin", "estyä", "estää", "etana", "eteen", "etelä", "etevä", "etsin", "etsiä", "etuus", "etydi", "eukko", "evätä", "faasi", "faija", "fakki", "faksi", "fakta", "farao", "farmi", "fatsi", "fauna", "fauni", "fiini", "fikka", "fiksu", "filee", "filmi", "finis", "finni", "firma", "fobia", "fokka", "foksi", "fokus", "folio", "formu", "forte", "fudia", "fudis", "fudut", "fuksi", "fusku", "futia", "futis", "fuuga", "fylli", "fääri", "fööni", "gaala", "gabro", "gaeli", "gamma", "gasti", "geeli", "geeni", "genre", "getto", "gimma", "glögi", "gongi", "gouda", "gradu", "grape", "grogi", "guano", "guava", "gängi", "haamu", "haapa", "haara", "haava", "haave", "haavi", "hahlo", "hahmo", "haiku", "haili", "haima", "haisu", "haite", "hakea", "hakku", "halia", "halju", "halki", "halko", "halla", "halli", "halma", "halme", "haloo", "halpa", "halva", "handu", "hanhi", "hanka", "hanke", "hanki", "hanko", "hansa", "hanti", "hapan", "happi", "happo", "hapro", "hapsi", "hapsu", "harha", "harja", "harju", "harme", "harmi", "haroa", "harri", "harso", "harsu", "harus", "harva", "hasis", "hassi", "hassu", "hattu", "haude", "hauis", "hauki", "hauli", "haura", "hauta", "hauva", "havas", "heavy", "hefta", "hehku", "hehto", "heila", "heili", "heimo", "heinä", "heisi", "heite", "heleä", "helke", "hella", "helle", "hellä", "helma", "helmi", "helpi", "helve", "hemmo", "henki", "henna", "henry", "hento", "heppa", "heppu", "hereä", "herja", "hermo", "herne", "herra", "herua", "hetiö", "hetki", "hevin", "hidas", "hieho", "hieno", "hiesu", "hieta", "hihna", "hiili", "hiiop", "hiiri", "hiisi", "hiiva", "hikka", "hilla", "hillo", "hilse", "hilut", "hindi", "hindu", "hinku", "hinta", "hioke", "hiomo", "hiota", "hipat", "hipiä", "hipoa", "hippa", "hippi", "hippu", "hirmu", "hirsi", "hirvi", "hissa", "hissi", "hitsi", "hitti", "hitto", "hiuka", "hiven", "hobby", "hohde", "hohka", "hohoi", "hohto", "hoide", "hoito", "hoiva", "hokea", "holli", "holvi", "homma", "honka", "hoopo", "hopea", "hoppu", "hormi", "horna", "horre", "hosua", "houre", "house", "huhta", "huilu", "huima", "huivi", "hukka", "hullu", "humma", "humus", "hunni", "huntu", "huoku", "huoli", "huone", "huono", "huopa", "huora", "huovi", "huppu", "hupsu", "hurja", "hurma", "hurme", "hurri", "hutsu", "huttu", "huuli", "huuma", "huume", "huuri", "huuru", "huusi", "huuti", "huuto", "hyhmä", "hylje", "hylky", "hylly", "hylsy", "hymen", "hymiö", "hymni", "hyppy", "hyrrä", "hytti", "hyvin", "hyyde", "hyytö", "hyöky", "hyöty", "hyötö", "häijy", "häive", "häivä", "häkki", "häntä", "häpeä", "häppä", "härkä", "härme", "härmä", "häviö", "häätö", "häävi", "hääyö", "höhlä", "höllä", "hölmö", "höpsö", "höpön", "hörhö", "höskä", "höttö", "höyde", "höyli", "höylä", "höynä", "höyry", "höyty", "icing", "idoli", "ihana", "iibis", "iikka", "iiris", "ikinä", "ikoni", "ikänä", "ikävä", "ikäys", "ikään", "ilkeä", "ilkiö", "ilman", "ilmiö", "iltti", "ilves", "image", "imago", "imelä", "immyt", "imuke", "imuri", "ininä", "input", "inssi", "intos", "intro", "intti", "ipana", "irviä", "iskeä", "islam", "isota", "isous", "istua", "isyys", "itara", "itkeä", "ivata", "iäksi", "iäkäs", "iätön", "jaaha", "jaala", "jahka", "jahti", "jakaa", "jakki", "jakku", "jakso", "jalan", "jalas", "jalka", "jalus", "jambi", "jamit", "jannu", "jaoke", "japsi", "jarru", "jatke", "jatko", "jatsi", "jauhe", "jauho", "jekku", "jemma", "jengi", "jenka", "jeppe", "jermu", "jetti", "jiddi", "jiiri", "jippo", "johde", "johto", "joiku", "jokin", "jolla", "jolma", "jonne", "jooga", "joogi", "jooli", "jospa", "joten", "jotos", "jotta", "jouhi", "joule", "joulu", "jousi", "juhla", "juhta", "jukka", "jukra", "julki", "julli", "julma", "jumbo", "junnu", "juoda", "juoma", "juomu", "juoni", "juopa", "juoru", "juote", "juova", "juppi", "juroa", "jurri", "jussi", "jutaa", "jutku", "juttu", "juuri", "jylhä", "jyske", "jytke", "jytää", "jäkki", "jälki", "jälsi", "jänis", "jänkä", "jänne", "jännä", "järeä", "järin", "järki", "järvi", "jäsen", "jätkä", "jätti", "jättö", "jätös", "jäyhä", "jäynä", "jäädä", "jäähy", "jäämä", "jäärä", "jäävi", "kaade", "kaali", "kaaos", "kaapu", "kaara", "kaari", "kaaso", "kaasu", "kaato", "kaava", "kahjo", "kahju", "kahle", "kahta", "kahva", "kahvi", "kaide", "kaihi", "kaiho", "kaiku", "kaima", "kaino", "kaira", "kaita", "kaivo", "kaivu", "kajal", "kakka", "kakku", "kakru", "kaksi", "kalhu", "kalja", "kalju", "kalke", "kalla", "kalle", "kallo", "kalma", "kalmo", "kalpa", "kalsa", "kalvo", "kamee", "kammo", "kampa", "kampe", "kampi", "kandi", "kanki", "kanna", "kanne", "kannu", "kansa", "kansi", "kanta", "kanto", "kapea", "kappa", "kappi", "kapse", "kaput", "karhe", "karhi", "karho", "karhu", "karja", "karju", "karku", "karma", "karmi", "karri", "karsi", "karva", "karve", "kaski", "kasko", "kasku", "kassa", "kassi", "kaste", "kasti", "kasvi", "kasvo", "kasvu", "katka", "katki", "katko", "katku", "katos", "katse", "katti", "katto", "katua", "katve", "kauan", "kauas", "kauha", "kauhu", "kaula", "kauna", "kaura", "kausi", "kavio", "kebab", "kehiä", "kehno", "kehnä", "kehrä", "kehto", "kehua", "kehys", "keija", "keiju", "keila", "keino", "keinu", "keiso", "kekri", "keksi", "kelju", "kello", "kelmi", "kelmu", "kelpo", "kelta", "kemia", "kemut", "kendo", "kenkä", "kenno", "kepeä", "keppi", "kerho", "keriä", "kerma", "kerni", "kersa", "kerta", "kerto", "keruu", "kesiä", "kessu", "kesti", "kesto", "ketju", "ketku", "ketsi", "ketto", "kettu", "keula", "keveä", "kevyt", "kevät", "khaki", "khmer", "kieli", "kielo", "kiero", "kierä", "kihti", "kiila", "kiilu", "kiima", "kiina", "kiire", "kiiri", "kiiru", "kiisu", "kiito", "kiivi", "kikka", "kilju", "kilke", "kilpa", "kilpi", "kilsa", "kilta", "kimeä", "kimma", "kimpi", "kingi", "kinos", "kinua", "kipeä", "kippi", "kippo", "kipsa", "kipsi", "kireä", "kiriä", "kirja", "kirje", "kirjo", "kirnu", "kirsi", "kirsu", "kirva", "kiska", "kisko", "kissa", "kitka", "kitku", "kitsi", "kitti", "kitua", "kiuas", "kiulu", "kiuru", "kiusa", "kives", "klani", "klapi", "klubi", "koala", "kobra", "kohde", "kohta", "kohti", "kohtu", "kohva", "koipi", "koira", "koisa", "koiso", "koite", "koivu", "kokea", "kokka", "kokki", "kokko", "koksi", "kolea", "kolho", "kolhu", "kolja", "kolke", "kolli", "kollo", "kolme", "koloa", "kolvi", "komea", "kompa", "konki", "konna", "konsa", "kontu", "koodi", "kooma", "koota", "kopea", "kopio", "kopla", "koppa", "koppi", "kopra", "kopse", "kopsu", "kopti", "korea", "koris", "korko", "korni", "korpi", "korsi", "korsu", "korte", "korva", "korvo", "kosia", "koska", "koski", "koste", "kosto", "kotia", "kotka", "kotoa", "kotsa", "kotva", "kouho", "koulu", "koura", "kouru", "kovaa", "kovin", "kovis", "krapu", "krimi", "kromi", "kränä", "kudin", "kudos", "kuhmu", "kuhun", "kuilu", "kuiri", "kuitu", "kuiva", "kukin", "kukka", "kukko", "kukku", "kuksa", "kulho", "kulju", "kulku", "kulli", "kulma", "kulta", "kulti", "kulua", "kumea", "kumma", "kummi", "kumpi", "kumpu", "kundi", "kunne", "kunpa", "kunta", "kunto", "kuoha", "kuohu", "kuola", "kuolo", "kuoma", "kuomu", "kuona", "kuono", "kuore", "kuori", "kuoro", "kuosi", "kuovi", "kupla", "kuppa", "kuppi", "kupro", "kupru", "kurdi", "kurho", "kurin", "kurja", "kurki", "kurko", "kuroa", "kurra", "kurre", "kurri", "kurva", "kurvi", "kuski", "kussa", "kusta", "kutea", "kuten", "kutka", "kutoa", "kutsu", "kuttu", "kuula", "kuulo", "kuulu", "kuuma", "kuume", "kuura", "kuuri", "kuuro", "kuusi", "kuvas", "kuvio", "kyetä", "kyhmy", "kylki", "kyllä", "kylmä", "kylpy", "kylvö", "kymri", "kyniä", "kynsi", "kynte", "kyntö", "kypsi", "kypsä", "kyrpä", "kyrsä", "kyssä", "kysta", "kystä", "kysyä", "kyteä", "kytis", "kytky", "kyttä", "kyylä", "kyyry", "kyyti", "kyömy", "käheä", "känni", "känny", "känsä", "käreä", "kärhi", "kärhö", "kärki", "kärri", "kärry", "kärsä", "käsin", "käsky", "käsnä", "kätkö", "käydä", "käypä", "käyrä", "käyte", "käyvä", "käämi", "kääpä", "kääre", "käärö", "kääty", "köhiä", "kökkö", "kölli", "kössi", "köyhä", "köyry", "köysi", "köyte", "kööri", "laaja", "laaka", "laaki", "laama", "laari", "laata", "laatu", "laava", "laavu", "lados", "lafka", "lahja", "lahje", "lahko", "lahna", "lahti", "laiha", "laiho", "laimi", "laina", "laine", "laita", "laite", "laiva", "lakea", "lakka", "lakki", "lakko", "lamee", "lampi", "lande", "lanka", "lanko", "lanne", "lanta", "laota", "lapio", "lappi", "lappo", "lappu", "lapsi", "largo", "laser", "lasko", "lasku", "lassi", "lasso", "lasta", "lasti", "lastu", "latoa", "latta", "latva", "laude", "lauha", "laulu", "lauma", "lause", "lauta", "lavea", "leffa", "lehmä", "lehti", "lehto", "lehvä", "leidi", "leija", "leike", "leili", "leima", "leimu", "leini", "leipä", "leiri", "leivo", "lelli", "lempi", "lempo", "lenko", "lento", "leppä", "lepra", "lepsu", "lesbo", "leski", "lesti", "lesty", "lestä", "letka", "letku", "letti", "letto", "lettu", "leuka", "leuku", "leuto", "leveä", "liata", "lieju", "lieka", "lieko", "liemi", "lieri", "liero", "liesi", "liesu", "liete", "lieve", "lievä", "lifti", "lihas", "lihoa", "liian", "liiga", "liika", "liike", "liila", "liima", "liina", "liira", "liite", "liito", "liitu", "liivi", "likin", "likka", "liksa", "lilja", "limbo", "limsa", "linja", "linko", "linna", "linni", "lintu", "liota", "lipas", "lipeä", "lipoa", "lippa", "lippi", "lippo", "lippu", "lipua", "liriä", "lirua", "lisko", "lista", "lisää", "litku", "litra", "litsa", "litsi", "liuku", "liuos", "liuta", "loata", "lobby", "loden", "lohko", "lohtu", "loimi", "loimu", "loiva", "lojua", "lokki", "lokse", "lommo", "lonka", "loosi", "loota", "lopen", "loppu", "lordi", "loska", "lossi", "lotja", "lotta", "lotto", "louhe", "luhta", "luhti", "luihu", "luiku", "luiru", "luisu", "lujaa", "lukea", "lukio", "lukki", "lukko", "luksi", "lulla", "lumen", "lumme", "lunki", "lunni", "luoda", "luode", "luoja", "luoko", "luola", "luoma", "luomi", "luona", "luota", "luoti", "luoto", "luova", "luovi", "luppi", "luppo", "lusia", "luste", "lusto", "lutka", "luulo", "luumu", "luuri", "luuta", "lyhde", "lyhki", "lyhty", "lyhyt", "lyijy", "lykky", "lymfa", "lypsy", "lyseo", "lysti", "lyydi", "lyyra", "lyödä", "lyöjä", "lähde", "lähes", "lähin", "lähiö", "lähtö", "läike", "läkki", "läksy", "lälly", "lämpö", "länsi", "läppä", "läpse", "lärvi", "läsiä", "läski", "läsnä", "lässy", "lätkä", "lätsä", "lätti", "lätty", "lääke", "lääni", "lääte", "läävä", "löllö", "lössi", "lötkö", "löyhä", "löyly", "löysä", "löytö", "maagi", "maali", "maamo", "maaru", "maata", "maate", "macho", "mafia", "magia", "magma", "magna", "mahis", "mahla", "mahti", "maija", "maila", "maili", "maine", "maiti", "maito", "makea", "makki", "makro", "maksa", "maksi", "maksu", "makuu", "malja", "malka", "malli", "malmi", "malto", "malva", "mamba", "mambo", "mamma", "mango", "mania", "manna", "manne", "mansi", "manto", "mantu", "mappi", "marja", "marsu", "marto", "maski", "massa", "massi", "massu", "masto", "mataa", "matka", "matsi", "matta", "matti", "matto", "mauri", "media", "meikä", "mekko", "melko", "meloa", "melto", "mennä", "menyy", "merta", "mesoa", "messi", "messu", "mesta", "metka", "metku", "metri", "metro", "metso", "metsä", "mieli", "miero", "miete", "mieto", "mihin", "miilu", "miina", "mikin", "mikki", "mikro", "miksi", "milli", "mimmi", "miniä", "minne", "mirha", "mirri", "missi", "missä", "mistä", "miten", "mitra", "mitta", "modus", "moike", "moite", "mokka", "molli", "mones", "monta", "moodi", "mooli", "moppi", "mopsi", "moron", "mosel", "moska", "motti", "motto", "muhea", "muhia", "muhvi", "muija", "mukaa", "muksu", "mulli", "multa", "mummi", "mummo", "mummu", "munia", "muona", "muori", "muoti", "muoto", "muovi", "murea", "muren", "murha", "murhe", "murju", "murre", "mursu", "murto", "museo", "mussu", "musta", "muste", "mutka", "mutsi", "mutta", "muuan", "muuli", "muuri", "muusa", "muusi", "myhky", "mykiö", "mykkä", "mylly", "myrha", "myski", "mysli", "myssy", "mytty", "myydä", "myyjä", "myyrä", "myyty", "myödä", "myöhä", "myötä", "mähkä", "mäihä", "mäike", "mälli", "mälsä", "mämmi", "mänty", "mäntä", "märkä", "mäsis", "mäski", "mätky", "mätäs", "mäyrä", "määre", "määrä", "mökki", "mölli", "mömmö", "mönjä", "möreä", "mörkö", "mössö", "mötti", "möyhy", "naali", "naama", "naara", "naava", "nafta", "nafti", "nahas", "nahka", "naida", "nakki", "naksu", "nalle", "nalli", "nanna", "nappa", "nappi", "nappo", "napsu", "narri", "nasse", "nassu", "nasta", "natsa", "natsi", "nauha", "naula", "nauru", "nauta", "neiti", "neito", "nekku", "nekru", "neliö", "neljä", "neppi", "neste", "netto", "neula", "neule", "neuvo", "nidos", "nielu", "niemi", "nihti", "niini", "niisi", "niksi", "nimiö", "niobi", "nippa", "nippu", "nirri", "nirso", "niska", "nisse", "nisti", "nitoa", "nitro", "niuho", "nivel", "nivoa", "noeta", "noita", "nokka", "nolla", "nopea", "noppa", "nopsa", "norja", "normi", "norri", "norsu", "norua", "noste", "nosto", "notko", "nousu", "nouto", "nugaa", "nuhde", "nuija", "nuiva", "nukka", "nukke", "nukki", "nulju", "nummi", "nunna", "nuoli", "nuolu", "nuora", "nuori", "nuppi", "nuppu", "nurea", "nurin", "nurja", "nurmi", "nuttu", "nuuka", "nykiä", "nykyä", "nylky", "nylon", "nymfi", "nynny", "nyppy", "nyreä", "nysty", "nyöri", "nähdä", "näkki", "näkyä", "nälkä", "nänni", "näppi", "näppy", "näpsä", "närhi", "näsiä", "nätti", "näyte", "näätä", "nössö", "nöyrä", "ohari", "oheen", "oheta", "ohhoh", "ohimo", "ohjas", "ohjus", "ohuus", "oieta", "oijoi", "oikea", "oikku", "oikoa", "oinas", "oitis", "ojoon", "ojuke", "oksia", "olake", "oleva", "olija", "omata", "omena", "ommel", "omppu", "onkia", "ontto", "ontua", "oppia", "optio", "orava", "origo", "orkku", "osake", "osata", "ostaa", "ostos", "osuma", "osuus", "osuva", "ottaa", "ovela", "paali", "paalu", "paanu", "paasi", "paavi", "paeta", "pahka", "pahki", "pahna", "pahus", "pahvi", "paine", "paini", "paino", "paise", "paita", "pakka", "pakki", "pakko", "paksu", "pakti", "palaa", "palho", "palje", "paljo", "palju", "palko", "palle", "palli", "pallo", "palmu", "paloa", "palsa", "palte", "paluu", "palvi", "pampa", "panda", "panna", "pannu", "panos", "panta", "pappa", "pappi", "paras", "parka", "parku", "parru", "parsa", "parsi", "parta", "party", "parvi", "pasha", "paska", "pasma", "passi", "pasta", "patee", "patio", "patja", "patti", "pauhu", "pauke", "paula", "pauna", "peeaa", "peesi", "peffa", "pehko", "pehku", "pehmo", "pehva", "peili", "peite", "pekka", "pelko", "pelle", "pelti", "pelto", "peluu", "penis", "penne", "penni", "penny", "pensa", "pentu", "peoni", "peppu", "perhe", "perho", "perin", "periä", "perna", "perse", "perso", "perua", "perus", "pervo", "pesin", "pesis", "pesiä", "peski", "pesti", "pesto", "pestä", "pesue", "pesye", "petos", "petsi", "pettu", "peura", "piano", "pidin", "pidot", "pieli", "piena", "pieni", "pieru", "pieti", "pietä", "pihiä", "pihka", "pihta", "pihvi", "piika", "piilo", "piilu", "piimä", "piina", "piiri", "piiru", "piisi", "pikaa", "pikee", "pikku", "pilke", "pilli", "pillu", "pilvi", "pimeä", "pimiö", "pinja", "pinko", "pinna", "pinne", "pinni", "pinta", "pioni", "pirta", "pirtu", "pisiä", "piski", "pissa", "pissi", "piste", "pisto", "pitko", "pitkä", "pitsa", "pitsi", "pitää", "piuha", "pizza", "plari", "platy", "pläsi", "plörö", "pohja", "pohje", "poies", "poiju", "poika", "poimu", "pokka", "poksi", "polio", "polku", "polla", "polle", "polte", "polvi", "pommi", "pomsi", "pondi", "ponsi", "pooli", "poolo", "poppa", "porho", "porno", "poski", "possu", "posti", "potea", "potka", "potku", "potra", "potta", "potti", "pottu", "pouta", "priki", "proto", "psori", "ptruu", "pudas", "puffi", "puhde", "puhki", "puhti", "puhua", "puhvi", "puida", "puija", "puite", "pujoa", "pujos", "pukea", "pukki", "pulja", "pulju", "pulla", "pullo", "pulma", "pulmu", "pummi", "punka", "punoa", "punos", "punta", "puola", "puoli", "puomi", "puosu", "puoti", "puppu", "purje", "purjo", "purku", "purra", "purse", "pursi", "purso", "pursu", "pusia", "puska", "pusku", "pussi", "pusta", "putka", "putki", "putti", "putto", "puuha", "puuma", "puuro", "puute", "pygmi", "pykiä", "pylly", "pyree", "pyrky", "pyssy", "pysti", "pysty", "pystö", "pysyä", "pyton", "pytty", "pyyde", "pyyhe", "pyöry", "pyörä", "pyörö", "päivä", "päkiä", "pälvi", "pännä", "pässi", "päteä", "pätkä", "pätsi", "pääri", "pääsy", "pääte", "pääty", "pöhkö", "pöhnä", "pökkö", "pökät", "pölhö", "pöljä", "pölli", "pölly", "pöllö", "pörrö", "pötky", "pötkö", "pötsi", "pöytä", "quasi", "raaja", "raaka", "raami", "raana", "raani", "raanu", "raape", "raasu", "raate", "raati", "raato", "rabbi", "radio", "radon", "rafla", "raguu", "rahje", "rahka", "rahna", "rahti", "rahtu", "raide", "railo", "raina", "raisu", "raita", "raito", "raivo", "rakas", "rakka", "rakki", "rakko", "raksa", "raksi", "ralli", "rambo", "rampa", "rangi", "ranka", "ranki", "ranko", "ranne", "ranta", "rantu", "rapea", "rappu", "rapse", "rapsi", "rapsu", "rasia", "rasko", "raspi", "rassi", "rassu", "rasta", "rasti", "rasva", "ratas", "ratki", "ratsu", "ratti", "ratto", "rauha", "rauta", "rautu", "ravet", "ravit", "rehti", "reiki", "reikä", "reilu", "reima", "reisi", "reivi", "rekka", "rekki", "reksi", "remmi", "renki", "rento", "repiä", "reppu", "repro", "reput", "respa", "ressu", "reteä", "retki", "retku", "reuma", "reuna", "revyy", "rieha", "riemu", "riena", "riepu", "riesa", "rievä", "rihla", "rihma", "riihi", "riimi", "riimu", "riisi", "riita", "riite", "riiuu", "rikas", "rikka", "rikki", "rikko", "rikos", "riksa", "riksi", "rimpi", "rimsu", "rinki", "rinne", "rinta", "ripeä", "rippi", "rippu", "ripsi", "ripsu", "riski", "risoa", "risti", "ritsa", "ritva", "riuku", "riuna", "rodeo", "rohjo", "rohmu", "rohto", "roihu", "roilo", "roima", "roina", "roisi", "rokka", "rokki", "rokko", "rombi", "rommi", "rompe", "rondi", "rondo", "rooli", "roosa", "ropse", "rosee", "roska", "rosti", "rosvo", "rotko", "rotsi", "rotta", "rouhe", "routa", "rouva", "rovio", "rugby", "ruhje", "rukka", "rukki", "ruksi", "rulla", "rumba", "rumpu", "rundi", "runko", "ruode", "ruoho", "ruoja", "ruoka", "ruoko", "ruori", "ruoti", "ruoto", "ruotu", "rupia", "rupla", "ruska", "rusko", "rusto", "rutka", "rutto", "ruttu", "ruuhi", "ruuma", "ruuna", "ruusu", "ruuti", "ruutu", "ruuvi", "ryhmy", "ryhmä", "ryhti", "ryijy", "rykiä", "ryntö", "rypeä", "ryppy", "rypsi", "rypäs", "ryske", "ryssä", "rysty", "rytke", "rytky", "rytmi", "ryväs", "ryyni", "ryysy", "ryyti", "ryönä", "rähjä", "rähmä", "räike", "räkiä", "räkki", "rämeä", "ränni", "räntä", "räppi", "räpse", "rästi", "rätti", "rääsy", "räävi", "rölli", "römeä", "rönsy", "rösti", "rötös", "röyhy", "rööki", "rööri", "saada", "saaga", "saago", "saaja", "saali", "saame", "saari", "saate", "saati", "saavi", "sabra", "sadas", "sadin", "saeta", "safka", "sahra", "sahti", "sahuu", "saita", "sakea", "sakka", "sakki", "sakko", "saksa", "salaa", "saldo", "salko", "salmi", "salon", "salpa", "salsa", "salva", "samba", "sambo", "samea", "sampi", "sampo", "samum", "sanka", "sanko", "sanoa", "santa", "sanue", "saota", "sappi", "sarja", "sarka", "sarvi", "sataa", "satsi", "saudi", "sauhu", "sauma", "sauna", "sauro", "sauva", "saves", "scifi", "seili", "seimi", "seinä", "seipi", "seita", "seiti", "sekka", "sekki", "seksi", "selin", "selja", "selko", "selkä", "selli", "sello", "sellu", "selus", "selvä", "selys", "seota", "seppo", "seppä", "serbi", "sermi", "serri", "servo", "setri", "setti", "seula", "seura", "seutu", "sidos", "sielu", "sieni", "siera", "sieto", "sietä", "sievä", "sigma", "sihti", "siika", "siili", "siilo", "siima", "siinä", "siipi", "siira", "siitä", "siivo", "siivu", "sikeä", "sikhi", "sikiö", "sikli", "siksi", "silat", "sileä", "silko", "silla", "silli", "sillä", "silmu", "silmä", "silsa", "silta", "silti", "sinko", "sinne", "sinut", "sioux", "sipsi", "sirri", "sisal", "sisar", "sisin", "sisko", "sissi", "sisus", "sitar", "siten", "sitko", "sitoa", "sitra", "sitsi", "siveä", "skeet", "skini", "skool", "slobo", "snadi", "snobi", "soeta", "softa", "sohia", "sohjo", "sohva", "soida", "soija", "soiro", "sokea", "sokka", "sokki", "sokko", "solki", "solmu", "solua", "sompa", "sondi", "sonni", "sonta", "sooda", "soolo", "sooma", "sooni", "soopa", "soosi", "sopia", "soppa", "soppi", "sorea", "sorja", "sormi", "sorry", "sorsa", "sorto", "sorva", "sorvi", "sossu", "sotia", "sotka", "sotku", "soutu", "souvi", "spora", "spray", "sprii", "stadi", "stidi", "stout", "sueta", "suhde", "suhta", "sujua", "sujut", "sukia", "sukka", "suksi", "sulaa", "sulfa", "sulho", "sulje", "sulka", "sulku", "sumea", "summa", "sunna", "sunni", "suoda", "suoja", "suola", "suoli", "suomi", "suomu", "suoni", "suopa", "suora", "suova", "suppa", "suppo", "surku", "surma", "surra", "surve", "sussu", "sutia", "sutki", "suttu", "suude", "suula", "suura", "suure", "suuri", "suute", "swing", "sydän", "sykli", "syksy", "sylki", "sylky", "syltä", "sylys", "synti", "synty", "syrjä", "sysiä", "syyhy", "syylä", "syyni", "syyte", "syödä", "syöjä", "syöpä", "sähke", "sähkö", "sähly", "säile", "säilä", "säilö", "säkki", "sälli", "sänki", "sänky", "säppi", "särki", "särky", "särmi", "särmä", "sätky", "sätkä", "sävel", "säyne", "sääde", "sääli", "sääri", "sääty", "säätö", "sössö", "taain", "taaja", "taala", "taara", "taata", "taeta", "tafti", "tahko", "tahma", "tahna", "tahra", "tahti", "tahto", "taide", "taiga", "taiji", "taika", "taimi", "taita", "taite", "taito", "taive", "taivo", "takaa", "takia", "takka", "takki", "takku", "takoa", "taksa", "taksi", "takuu", "talas", "talja", "talla", "talli", "talvi", "tamma", "tammi", "tango", "tanhu", "tanka", "tanko", "tappi", "tappo", "tapsi", "tarha", "tarke", "tarmo", "tarot", "tarra", "tarve", "tasan", "tasku", "tassi", "tassu", "tatar", "tatti", "tauko", "taula", "taulu", "tauti", "tavis", "teddy", "teema", "teeri", "teesi", "tehdä", "teili", "teini", "tekno", "telje", "teljo", "telki", "teloa", "tempo", "tenho", "terho", "teriö", "termi", "terva", "terve", "teräs", "tesla", "tesma", "testi", "tetra", "tiede", "tiera", "tieto", "tietä", "tiheä", "tihku", "tiili", "tiima", "tiimi", "tiine", "tiinu", "tiira", "tikka", "tikki", "tikku", "tikli", "tilde", "tilhi", "tilke", "tilli", "tilsa", "tilus", "tinka", "tinki", "tippa", "tippi", "tirri", "tiski", "tisle", "tissi", "tiuha", "tiuku", "toeta", "toimi", "toive", "toivo", "tokka", "tokko", "tollo", "tonne", "tonni", "tonus", "tooga", "toope", "toora", "toosa", "toppa", "toppi", "torke", "torni", "torso", "torua", "torut", "torvi", "tosin", "tosio", "tossu", "totta", "touhu", "touko", "touvi", "trial", "tuhat", "tuhka", "tuhma", "tuhru", "tuhti", "tuhto", "tuija", "tuiju", "tuike", "tuiki", "tuima", "tukea", "tukka", "tukki", "tukko", "tukku", "tukos", "tulla", "tulli", "tulos", "tulva", "tumma", "tunku", "tunne", "tunti", "tunto", "tuntu", "tuoda", "tuohi", "tuoja", "tuoli", "tuomi", "tuoni", "tuore", "tuote", "tupas", "tupee", "tupla", "tuppi", "tuppo", "tupsu", "turbo", "turha", "turku", "turma", "turpa", "turri", "turso", "turta", "turva", "turve", "tuska", "tussi", "tussu", "tutia", "tutka", "tutor", "tutsi", "tutti", "tuttu", "tutua", "tuuba", "tuubi", "tuuli", "tuuma", "tuura", "tuuri", "tweed", "twist", "tyhjä", "tyhjö", "tyhmä", "tykki", "tykky", "tyköä", "tylli", "tylsä", "tynkä", "typpi", "typäs", "tyriä", "tyrmä", "tyrni", "tytti", "tyttö", "tytär", "tyven", "tyyli", "tyyni", "tyyny", "tähde", "tähkä", "tähti", "tähän", "täkki", "tälli", "tänne", "täplä", "tässä", "tästä", "täten", "täysi", "täyte", "töhkä", "tölli", "töniä", "törky", "törmä", "tötsä", "töyry", "uhata", "uhkea", "uhkua", "uhota", "uikku", "uinti", "uinua", "uisko", "uitto", "ujous", "ukuli", "ulina", "uljas", "ulkoa", "uloin", "uloke", "ulota", "ulvoa", "umbra", "ummet", "umpio", "unssi", "upeus", "upota", "upote", "upsis", "urhea", "urina", "usein", "useus", "uskoa", "utare", "utelu", "uudin", "uumen", "uupua", "uuras", "uurna", "uurre", "uurto", "uusia", "uutto", "uuttu", "vaade", "vaaka", "vaali", "vaara", "vaari", "vaasi", "vaata", "vaate", "vahti", "vahva", "vaihe", "vaimo", "vaino", "vainu", "vaisu", "vaiti", "vaiva", "vajaa", "vakaa", "vakio", "vakka", "vaksi", "valaa", "valas", "valhe", "valin", "valio", "valju", "valli", "valmu", "valos", "valta", "valua", "valve", "vamma", "vanha", "vanja", "vanki", "vanna", "vanne", "vanua", "vapaa", "vappu", "varas", "varho", "varis", "varjo", "varma", "varoa", "varpu", "varsa", "varsi", "varte", "varus", "varvi", "vasen", "vaski", "vasoa", "vasta", "vaste", "vatja", "vatsa", "vatti", "vattu", "vaunu", "vauva", "vedin", "vedos", "vehje", "vehka", "vehnä", "veisu", "veivi", "vekki", "velho", "velka", "velli", "velmu", "venhe", "venho", "venyä", "venät", "veppi", "vepsä", "verbi", "veres", "verho", "verka", "verso", "verta", "verto", "veska", "veski", "vesoa", "vessa", "vetää", "vichy", "video", "viedä", "viehe", "viejä", "vielä", "vieno", "vieri", "vihje", "vihko", "vihma", "vihne", "vihta", "viila", "viili", "viilu", "viima", "viime", "viina", "viini", "viira", "viiri", "viiru", "viisi", "viisu", "viita", "viite", "viiva", "viive", "viklo", "vilja", "vilke", "villa", "villi", "vimma", "vinha", "vinka", "vinku", "viola", "vippa", "vippi", "vireä", "virhe", "viriö", "virka", "virke", "virna", "virne", "virpi", "virsi", "virsu", "virta", "virua", "virus", "visio", "viski", "vissi", "vissy", "visti", "visva", "vitja", "vitka", "vitoa", "vitsa", "vitsi", "vittu", "viulu", "vodka", "vohla", "voida", "voide", "voima", "vokki", "vormu", "votka", "vouti", "vulva", "vuode", "vuohi", "vuoka", "vuolu", "vuona", "vuono", "vuori", "vuoro", "vuosi", "vuota", "vuoto", "vyöry", "vyöte", "vähin", "vähän", "väite", "väive", "väljä", "välke", "välys", "värve", "väsky", "väsyä", "vätys", "väylä", "väärä", "watti", "weber", "wessi", "yhdes", "yhtiö", "yhtye", "yhtyä", "yhäti", "yksin", "yksiö", "yletä", "ylevä", "ylite", "ylpeä", "yltyä", "yltää", "ylväs", "ylävä", "yninä", "ynseä", "yrmeä", "yrtti", "yskiä", "yskös", "yöasu", "yökkö", "yöpuu", "yöpyä", "yötyö", "yötön", "yöuni", "zambo", "zloty", "zombi", "zoomi", "ähinä", "ähkiä", "ähkyä", "ähkää", "äiskä", "äityä", "äkeys", "äkkiä", "äkämä", "äkätä", "älinä", "älkää", "älytä", "ämyri", "änkkä", "äpäre", "äpärä", "äreys", "ärinä", "ärjyä", "ärtyä", "äsken", "äyräs", "ääliö", "äänes", "äänne", "ääntö", "öinen", "öisin", "ölinä", "örinä"];
+
+// ─── Game constants ───────────────────────────────────────────────────────────
+const WORD_LENGTH = 5;
+const MAX_GUESSES = 6;
+const STORAGE_KEY = 'sanapeli-state';
+const STATS_KEY   = 'sanapeli-stats';
+
+// ─── Keyboard layout ─────────────────────────────────────────────────────────
+const KEYBOARD = [
+  ['q','w','e','r','t','y','u','i','o','p','å'],
+  ['a','s','d','f','g','h','j','k','l','ö','ä'],
+  ['ENTER','z','x','c','v','b','n','m','⌫'],
+];
+
+// ─── Daily word selection ─────────────────────────────────────────────────────
+function getDayIndex() {
+  const epoch = new Date('2024-01-01T00:00:00+02:00');
+  const now   = new Date();
+  const nowFi = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Helsinki' }));
+  const diffMs = nowFi - epoch;
+  return Math.floor(diffMs / 86400000);
+}
+
+function getDailyWord() {
+  const idx = getDayIndex();
+  return WORDS[idx % WORDS.length];
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let answer   = getDailyWord();
+let guesses  = [];
+let current  = '';
+let gameOver = false;
+let dayIndex = getDayIndex();
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s.dayIndex !== dayIndex) return; // new day
+    guesses  = s.guesses  || [];
+    current  = '';
+    gameOver = s.gameOver || false;
+  } catch {}
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ dayIndex, guesses, gameOver }));
+}
+
+function loadStats() {
+  try { return JSON.parse(localStorage.getItem(STATS_KEY)) || defaultStats(); }
+  catch { return defaultStats(); }
+}
+
+function defaultStats() {
+  return { played: 0, wins: 0, streak: 0, maxStreak: 0, lastWinDay: -1 };
+}
+
+function saveStats(stats) {
+  localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+}
+
+// ─── Board rendering ──────────────────────────────────────────────────────────
+const boardEl = document.getElementById('board');
+
+function buildBoard() {
+  boardEl.innerHTML = '';
+  for (let r = 0; r < MAX_GUESSES; r++) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.id = `row-${r}`;
+    for (let c = 0; c < WORD_LENGTH; c++) {
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.id = `tile-${r}-${c}`;
+      row.appendChild(tile);
+    }
+    boardEl.appendChild(row);
+  }
+}
+
+function updateBoard() {
+  for (let r = 0; r < guesses.length; r++) {
+    const result = evaluate(guesses[r]);
+    for (let c = 0; c < WORD_LENGTH; c++) {
+      const tile = document.getElementById(`tile-${r}-${c}`);
+      tile.textContent = guesses[r][c].toUpperCase();
+      tile.dataset.letter = guesses[r][c];
+      tile.className = `tile ${result[c]}`;
+    }
+  }
+  // Current input row
+  const r = guesses.length;
+  if (!gameOver) {
+    for (let c = 0; c < WORD_LENGTH; c++) {
+      const tile = document.getElementById(`tile-${r}-${c}`);
+      const letter = current[c] || '';
+      tile.textContent = letter.toUpperCase();
+      if (letter) tile.dataset.letter = letter;
+      else delete tile.dataset.letter;
+      tile.className = 'tile';
+    }
+  }
+}
+
+// ─── Evaluate a guess ─────────────────────────────────────────────────────────
+function evaluate(guess) {
+  const result = Array(WORD_LENGTH).fill('absent');
+  const ansArr = answer.split('');
+  const gArr   = guess.split('');
+  // First pass: correct
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    if (gArr[i] === ansArr[i]) {
+      result[i] = 'correct';
+      ansArr[i] = null;
+      gArr[i]   = null;
+    }
+  }
+  // Second pass: present
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    if (gArr[i] === null) continue;
+    const j = ansArr.indexOf(gArr[i]);
+    if (j !== -1) {
+      result[i] = 'present';
+      ansArr[j] = null;
+    }
+  }
+  return result;
+}
+
+// ─── Keyboard rendering ───────────────────────────────────────────────────────
+const keyboardEl = document.getElementById('keyboard');
+const keyMap = {};
+
+function buildKeyboard() {
+  keyboardEl.innerHTML = '';
+  KEYBOARD.forEach(row => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'key-row';
+    row.forEach(k => {
+      const btn = document.createElement('button');
+      btn.className = 'key' + (k.length > 1 ? ' wide' : '');
+      btn.textContent = k === '⌫' ? '⌫' : k.toUpperCase();
+      btn.dataset.key = k;
+      btn.addEventListener('click', () => handleKey(k));
+      if (k.length === 1) keyMap[k] = btn;
+      rowEl.appendChild(btn);
+    });
+    keyboardEl.appendChild(rowEl);
+  });
+}
+
+function updateKeyboard() {
+  // Reset all
+  Object.values(keyMap).forEach(btn => {
+    btn.classList.remove('correct', 'present', 'absent');
+  });
+  // Apply from guesses (correct > present > absent priority)
+  const priority = { correct: 3, present: 2, absent: 1 };
+  const best = {};
+  guesses.forEach(guess => {
+    const result = evaluate(guess);
+    guess.split('').forEach((ch, i) => {
+      const s = result[i];
+      if (!best[ch] || priority[s] > priority[best[ch]]) best[ch] = s;
+    });
+  });
+  Object.entries(best).forEach(([ch, state]) => {
+    if (keyMap[ch]) keyMap[ch].classList.add(state);
+  });
+}
+
+// ─── Input handling ───────────────────────────────────────────────────────────
+function handleKey(key) {
+  if (gameOver) return;
+  const k = key.toLowerCase();
+  if (k === 'enter') {
+    submitGuess();
+  } else if (k === '⌫' || k === 'backspace') {
+    current = current.slice(0, -1);
+    updateBoard();
+  } else if (/^[a-zäöå]$/.test(k) && current.length < WORD_LENGTH) {
+    current += k;
+    const tile = document.getElementById(`tile-${guesses.length}-${current.length - 1}`);
+    tile.classList.add('pop');
+    tile.addEventListener('animationend', () => tile.classList.remove('pop'), { once: true });
+    updateBoard();
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const k = e.key;
+  if (k === 'Enter') handleKey('enter');
+  else if (k === 'Backspace') handleKey('⌫');
+  else if (k.length === 1 && /^[a-zäöåA-ZÄÖÅ]$/.test(k)) handleKey(k.toLowerCase());
+});
+
+// ─── Submit guess ─────────────────────────────────────────────────────────────
+function submitGuess() {
+  if (current.length < WORD_LENGTH) {
+    showToast('Liian lyhyt sana');
+    shakeRow(guesses.length);
+    return;
+  }
+  if (!WORDS.includes(current)) {
+    showToast('Ei sanalistassa');
+    shakeRow(guesses.length);
+    return;
+  }
+
+  const result = evaluate(current);
+  guesses.push(current);
+  current = '';
+
+  revealRow(guesses.length - 1, result, () => {
+    updateKeyboard();
+    const won = result.every(r => r === 'correct');
+    if (won) {
+      gameOver = true;
+      saveState();
+      updateStats(true);
+      const msgs = ['Erinomainen!','Upea!','Hienoa!','Hyvin tehty!','Siistiä!','Phew!'];
+      const msg = guesses.length <= msgs.length ? msgs[guesses.length - 1] : 'Hienoa!';
+      setTimeout(() => { showToast(msg); bounceRow(guesses.length - 1); }, 200);
+      setTimeout(() => showStatsModal(), 2000);
+    } else if (guesses.length === MAX_GUESSES) {
+      gameOver = true;
+      saveState();
+      updateStats(false);
+      setTimeout(() => showStatsModal(), 1600);
+    } else {
+      saveState();
+    }
+  });
+}
+
+function revealRow(row, result, onDone) {
+  for (let c = 0; c < WORD_LENGTH; c++) {
+    const tile = document.getElementById(`tile-${row}-${c}`);
+    const delay = c * 300;
+    setTimeout(() => {
+      tile.classList.add('reveal');
+      setTimeout(() => {
+        tile.classList.remove('reveal');
+        tile.className = `tile ${result[c]}`;
+      }, 250);
+    }, delay);
+  }
+  if (onDone) setTimeout(onDone, WORD_LENGTH * 300 + 300);
+}
+
+function shakeRow(row) {
+  const rowEl = document.getElementById(`row-${row}`);
+  rowEl.classList.add('shake');
+  rowEl.addEventListener('animationend', () => rowEl.classList.remove('shake'), { once: true });
+}
+
+function bounceRow(row) {
+  for (let c = 0; c < WORD_LENGTH; c++) {
+    const tile = document.getElementById(`tile-${row}-${c}`);
+    setTimeout(() => {
+      tile.classList.add('bounce');
+      tile.addEventListener('animationend', () => tile.classList.remove('bounce'), { once: true });
+    }, c * 100);
+  }
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+function showToast(msg, duration = 1600) {
+  const container = document.getElementById('toast-container');
+  const div = document.createElement('div');
+  div.className = 'toast';
+  div.textContent = msg;
+  container.appendChild(div);
+  setTimeout(() => {
+    div.classList.add('fade-out');
+    div.addEventListener('transitionend', () => div.remove(), { once: true });
+  }, duration);
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+function updateStats(won) {
+  const stats = loadStats();
+  stats.played++;
+  if (won) {
+    stats.wins++;
+    if (stats.lastWinDay === dayIndex - 1) stats.streak++;
+    else stats.streak = 1;
+    stats.lastWinDay = dayIndex;
+    if (stats.streak > stats.maxStreak) stats.maxStreak = stats.streak;
+  } else {
+    stats.streak = 0;
+  }
+  saveStats(stats);
+}
+
+// ─── Stats modal ──────────────────────────────────────────────────────────────
+function showStatsModal() {
+  const stats = loadStats();
+  document.getElementById('s-played').textContent = stats.played;
+  document.getElementById('s-winpct').textContent = stats.played > 0 ? Math.round(stats.wins / stats.played * 100) : 0;
+  document.getElementById('s-streak').textContent = stats.streak;
+  document.getElementById('s-maxstreak').textContent = stats.maxStreak;
+
+  const revealEl = document.getElementById('answer-reveal');
+  if (gameOver) {
+    revealEl.innerHTML = `Sana oli: <strong>${answer}</strong>`;
+  } else {
+    revealEl.textContent = '';
+  }
+
+  document.getElementById('stats-modal').classList.add('open');
+  startCountdown();
+}
+
+function startCountdown() {
+  function tick() {
+    const now   = new Date();
+    const nowFi = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Helsinki' }));
+    const tomorrow = new Date(nowFi);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const diff = tomorrow - nowFi;
+    const h = String(Math.floor(diff / 3600000)).padStart(2,'0');
+    const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2,'0');
+    const s = String(Math.floor((diff % 60000) / 1000)).padStart(2,'0');
+    const el = document.getElementById('countdown');
+    if (el) el.textContent = `${h}:${m}:${s}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+// ─── Share ────────────────────────────────────────────────────────────────────
+document.getElementById('share-btn').addEventListener('click', () => {
+  const squares = guesses.map(g => {
+    return evaluate(g).map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛').join('');
+  }).join('\n');
+  const won = guesses.length > 0 && evaluate(guesses[guesses.length-1]).every(r => r === 'correct');
+  const score = won ? guesses.length : 'X';
+  const text = `Sanapeli ${dayIndex} ${score}/${MAX_GUESSES}\n\n${squares}`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => showToast('Kopioitu!'));
+  } else {
+    showToast(text);
+  }
+});
+
+// ─── Modals ───────────────────────────────────────────────────────────────────
+document.getElementById('help-btn').addEventListener('click', () => {
+  document.getElementById('help-modal').classList.add('open');
+});
+
+document.getElementById('help-close').addEventListener('click', () => {
+  document.getElementById('help-modal').classList.remove('open');
+});
+
+document.getElementById('stats-close').addEventListener('click', () => {
+  document.getElementById('stats-modal').classList.remove('open');
+});
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+buildBoard();
+buildKeyboard();
+loadState();
+
+// Restore board from saved guesses
+for (let r = 0; r < guesses.length; r++) {
+  const result = evaluate(guesses[r]);
+  for (let c = 0; c < WORD_LENGTH; c++) {
+    const tile = document.getElementById(`tile-${r}-${c}`);
+    tile.textContent = guesses[r][c].toUpperCase();
+    tile.dataset.letter = guesses[r][c];
+    tile.className = `tile ${result[c]}`;
+  }
+}
+
+updateKeyboard();
+
+if (gameOver && guesses.length > 0) {
+  // Show answer if lost
+  const won = evaluate(guesses[guesses.length-1]).every(r => r === 'correct');
+  if (!won) {
+    setTimeout(() => showToast(answer.toUpperCase(), 4000), 300);
+  }
+}
+
+// First visit: show help
+if (!localStorage.getItem(STORAGE_KEY)) {
+  document.getElementById('help-modal').classList.add('open');
+}
+</script>
+</body>
+</html>
