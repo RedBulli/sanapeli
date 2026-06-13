@@ -342,6 +342,22 @@
 
     #share-btn:hover { filter: brightness(1.1); }
 
+    #new-word-btn {
+      background: var(--key-bg);
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      margin-top: 10px;
+      width: 100%;
+    }
+
+    #new-word-btn:hover { filter: brightness(1.2); }
+
     #answer-reveal {
       margin-top: 12px;
       font-size: 0.9rem;
@@ -352,6 +368,17 @@
       color: var(--text);
       text-transform: uppercase;
     }
+
+    #practice-indicator {
+      display: none;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--present);
+      text-align: center;
+      padding: 3px 0 0;
+    }
   </style>
 </head>
 <body>
@@ -360,6 +387,7 @@
   <h1>Sanapeli</h1>
   <button id="help-btn" aria-label="Ohjeet">?</button>
 </header>
+<div id="practice-indicator">Harjoituspeli</div>
 
 <div id="toast-container"></div>
 
@@ -426,6 +454,7 @@
       <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)">Seuraava sana</div>
       <div id="countdown">--:--:--</div>
       <button id="share-btn">Jaa tulos 📤</button>
+      <button id="new-word-btn">Uusi sana 🎲</button>
       <div id="answer-reveal"></div>
     </div>
   </div>
@@ -463,11 +492,12 @@ function getDailyWord() {
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
-let answer   = getDailyWord();
-let guesses  = [];
-let current  = '';
-let gameOver = false;
-let dayIndex = getDayIndex();
+let answer      = getDailyWord();
+let guesses     = [];
+let current     = '';
+let gameOver    = false;
+let dayIndex    = getDayIndex();
+let practiceMode = false;
 
 function loadState() {
   try {
@@ -717,8 +747,29 @@ function showToast(msg, duration = 1600) {
   }, duration);
 }
 
+// ─── New word (practice) ──────────────────────────────────────────────────────
+function startNewWord() {
+  let newWord;
+  do {
+    newWord = WORDS[Math.floor(Math.random() * WORDS.length)];
+  } while (newWord === answer && WORDS.length > 1);
+
+  answer      = newWord;
+  guesses     = [];
+  current     = '';
+  gameOver    = false;
+  practiceMode = true;
+
+  buildBoard();
+  buildKeyboard();
+
+  document.getElementById('stats-modal').classList.remove('open');
+  document.getElementById('practice-indicator').style.display = '';
+}
+
 // ─── Stats ────────────────────────────────────────────────────────────────────
 function updateStats(won) {
+  if (practiceMode) return;
   const stats = loadStats();
   stats.played++;
   if (won) {
@@ -797,6 +848,8 @@ document.getElementById('help-close').addEventListener('click', () => {
 document.getElementById('stats-close').addEventListener('click', () => {
   document.getElementById('stats-modal').classList.remove('open');
 });
+
+document.getElementById('new-word-btn').addEventListener('click', startNewWord);
 
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => {
