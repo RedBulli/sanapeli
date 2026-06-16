@@ -512,6 +512,7 @@ function loadState() {
 }
 
 function saveState() {
+  if (practiceMode) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ dayIndex, guesses, gameOver }));
 }
 
@@ -763,6 +764,7 @@ function startNewWord() {
   buildBoard();
   buildKeyboard();
 
+  localStorage.removeItem(STORAGE_KEY);
   document.getElementById('stats-modal').classList.remove('open');
   document.getElementById('practice-indicator').style.display = '';
 }
