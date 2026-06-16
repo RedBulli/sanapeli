@@ -64,6 +64,18 @@
       padding: 4px 8px;
     }
 
+    #stats-btn {
+      position: absolute;
+      left: 16px;
+      background: none;
+      border: none;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 1.4rem;
+      line-height: 1;
+      padding: 4px 8px;
+    }
+
     #toast-container {
       position: fixed;
       top: 70px;
@@ -384,6 +396,7 @@
 <body>
 
 <header>
+  <button id="stats-btn" aria-label="Tilastot">📊</button>
   <h1>Sanapeli</h1>
   <button id="help-btn" aria-label="Ohjeet">?</button>
 </header>
@@ -839,6 +852,10 @@ document.getElementById('share-btn').addEventListener('click', () => {
 });
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
+document.getElementById('stats-btn').addEventListener('click', () => {
+  showStatsModal();
+});
+
 document.getElementById('help-btn').addEventListener('click', () => {
   document.getElementById('help-modal').classList.add('open');
 });
